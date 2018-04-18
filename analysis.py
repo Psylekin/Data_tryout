@@ -55,8 +55,8 @@ def makeCats(X, columns):
 
 
 #%% Loading Data & Editing Data
-X = pd.read_csv("/home/psylekin/AnacondaProjects/Capstone/train_values.csv", index_col = 0)
-y = pd.read_csv("/home/psylekin/AnacondaProjects/Capstone/train_labels.csv", index_col = 0)
+X = pd.read_csv("/home/psylekin/AnacondaProjects/data_cap/train_values.csv", index_col = 0)
+y = pd.read_csv("/home/psylekin/AnacondaProjects/data_cap/train_labels.csv", index_col = 0)
 catlist = ['geo_level_1_id', 'geo_level_2_id', 'geo_level_3_id',"land_surface_condition", "foundation_type", "roof_type", "ground_floor_type", "other_floor_type", "position", "plan_configuration", "legal_ownership_status"]
 makeCats(X,catlist)
 

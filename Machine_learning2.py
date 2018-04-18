@@ -40,6 +40,7 @@ from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.ensemble import BaggingClassifier
 # Scoring
 from sklearn.metrics import f1_score
+from sklearn.linear_model import LogisticRegression
 
 
 #%% Functions
@@ -57,15 +58,10 @@ def makeCats(X, columns):
 start_time = datetime.now()
 
 #%%Pipeline
-reductor = PCA(n_components = 8)
-scaler = KernelCenterer()
-classifier = RandomForestClassifier()
-
-
 pipe = Pipeline([
-    ('reduce_dim', reductor),
-    ('Scaler', scaler),
-    ('classify', classifier)
+    ('reduce_dim', PCA(n_components = 8)),
+    ('Scaler', KernelCenterer()),
+    ('classify', RandomForestClassifier())
 ])
     
 #%% RandomizedSearchCV
@@ -78,9 +74,10 @@ C_values = [0.001, 0.01,0.1,1]
 # specify parameters and distributions to sample from
 param_dist = {
         'reduce_dim': [PCA()],
-        'classify' : [RandomForestClassifier()],
-        'classify__n_estimators' : randint(1,20),
-        'classify__max_depth' : randint(1,10)
+        'classify' : [LogisticRegression()],
+        'classify__penalty' : ["l1","l2"],
+        'classify__tol' : randint(0.001,1),
+        'classify__C' : randint(0.5,1.5),
         }
 
 # run randomized search
@@ -88,46 +85,11 @@ n_iter_search = 50
 n_jobs = 10
 grid = RandomizedSearchCV(pipe, n_jobs = n_jobs, scoring = "f1_micro", param_distributions = param_dist, n_iter = n_iter_search)
 
-#%%GridSearchCV
-n_components = [3,5,7,9,11,13]
-n_estimators = [5,7,9,11,13,15]
-n_neighbors = [3,5,7,9]
-C_values = [0.5,0.8,1,1.3,1.5]
-
-param_grid = [{
-        'reduce_dim': [PCA()],
-        'reduce_dim__n_components': n_components,
-        'classify': [SVC()],
-        'classify__kernel' : ["linear"],
-        'classify__C' : C_values
-        }]
-"""
-{
-        'reduce_dim': [PCA()],
-        'reduce_dim__n_components': n_components,
-        'classify': [KNeighborsClassifier()],
-        'classify__n_neighbors' : n_neighbors
-        }
-
-{
-        'reduce_dim': [PCA()],
-        'reduce_dim__n_components': n_components,
-        'classify': [RandomForestClassifier()],
-        'classify__n_estimators' : n_estimators
-        }
-{
-    'reduce_dim': [PCA()],
-    'reduce_dim__n_components': n_components,
-    'classify': [SVC()],
-    'classify__kernel' : ["rbf"]
-    }
-"""
-
-# grid = GridSearchCV(pipe, cv=3, n_jobs=1, scoring = "f1_micro", param_grid = param_grid)
-
 #%% Loading Data & Editing Data
-X = pd.read_csv("/home/psylekin/AnacondaProjects/Capstone/train_values.csv", index_col = 0)
-y = pd.read_csv("/home/psylekin/AnacondaProjects/Capstone/train_labels.csv", index_col = 0).as_matrix().ravel()
+X = pd.read_csv("/home/psylekin/AnacondaProjects/data_cap/train_values.csv", index_col = 0)
+y = pd.read_csv("/home/psylekin/AnacondaProjects/data_cap/train_labels.csv", index_col = 0)
+y = y.replace([2,3],0).as_matrix().ravel()
+
 catlist = ['geo_level_1_id', 'geo_level_2_id', 'geo_level_3_id',"land_surface_condition", "foundation_type", "roof_type", "ground_floor_type", "other_floor_type", "position", "plan_configuration", "legal_ownership_status"]
 makeCats(X,catlist)
 
@@ -135,8 +97,10 @@ makeCats(X,catlist)
 grid.fit(X, y)
 results = pd.DataFrame(grid.cv_results_)
 
-#%% Generate output
+#%% Stacking? Superstructures? Together?
 
+#%% Generate output
+"""
 X_testing = pd.read_csv("/home/psylekin/AnacondaProjects/Capstone/test_values.csv", index_col = 0)
 makeCats(X_testing,catlist)
 
@@ -156,4 +120,4 @@ with open("/home/psylekin/AnacondaProjects/Capstone/log.txt", 'a') as outfile:
         outfile.write(x)
     for key in grid.best_params_:
         outfile.write(str(grid.best_params_[key]))
-    
+"""

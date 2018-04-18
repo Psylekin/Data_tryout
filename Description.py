@@ -33,7 +33,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.ensemble import BaggingClassifier
 # Scoring
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, precision_score
 from sklearn.linear_model import LogisticRegression
 
 
@@ -109,10 +109,17 @@ Cs = np.logspace(-1, 1, 10)
 estimator = GridSearchCV(pipe,
                          dict(pca__n_components=n_components,
                               logistic__C=Cs),
-                              scoring = "f1_micro")
+                              scoring = "f1_micro",
+                              return_train_score=True)
 estimator.fit(X, y0)
 best_results0 = pd.DataFrame(estimator.cv_results_)
 print("Results 0 are ready!")
+
+prediction = estimator.predict(X)
+
+print("Estimator Total\nF1 Score: \t", f1_score(y0, prediction, average='micro'))
+print("Precision : \t", precision_score(y0, prediction, average = 'micro'))
+
 
 #%% Importance picker
 """

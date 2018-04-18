@@ -16,8 +16,8 @@ import seaborn as sns
 
 # Pipeline-Testing
 from sklearn.pipeline import Pipeline
-from scipy.stats import randint
-from sklearn.model_selection import GridSearchCV, train_test_split
+from scipy.stats import randint as sp_randint
+from sklearn.model_selection import RandomizedSearchCV,GridSearchCV, train_test_split
 
 # Dimensionality reduction
 from sklearn.decomposition import PCA
@@ -28,7 +28,13 @@ from sklearn.preprocessing import Normalizer, MaxAbsScaler, MinMaxScaler, Kernel
 
 # Mashine Learning
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC, LinearSVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
 
+# Scoring
+from sklearn.metrics import f1_score, precision_score
 
 #%% Functions
 def makeCats(data, columns):
@@ -80,14 +86,22 @@ for x in catlist:
 #Split Categories X_testing
 for x in catlist[1:]:
     new_xdf = pd.get_dummies(X_testing[x],prefix = x)
-    X_testing = X_testing.join(new_xdf) #TODO: Fix this
+    X_testing = X_testing.join(new_xdf)
     
 end_time = datetime.now()
-print("Cleaning done \n ",'Duration: {}'.format(end_time - start_time),
+print("Cleaning done \n ",'Duration: \t{}'.format(end_time - start_time),
       "\n+++++++++++++++++++++++++++++")
 
+#%% Splitting
+sampleset = df.sample(100)
+df = df.drop(sampleset.index)
 
-#%% Splitting for damage grade 0
+y_gen_sampleset = sampleset.damage_grade
+y0_sampleset = sampleset.damage_grade_0
+y1_sampleset = sampleset.damage_grade_1
+y2_sampleset = sampleset.damage_grade_2
+X_sampleset = sampleset.drop(["damage_grade","damage_grade_0","damage_grade_1","damage_grade_2"], axis = 1)  
+
 y_gen = df.damage_grade
 y0 = df.damage_grade_0
 y1 = df.damage_grade_1
@@ -95,47 +109,176 @@ y2 = df.damage_grade_2
 X = df.drop(["damage_grade","damage_grade_0","damage_grade_1","damage_grade_2"], axis = 1)  
 
 end_time = datetime.now()
-print("Splitting done \n ",'Duration: {}'.format(end_time - start_time),
+print("Splitting done \n ",'Duration: \t{}'.format(end_time - start_time),
       "\n+++++++++++++++++++++++++++++")
 
-#%% Pipeline for 0 or other
-logistic = LogisticRegression()
-pca = PCA()
-pipe = Pipeline(steps=[
-        ('pca', pca), 
-        ('logistic', logistic)
-        ])
+#%% Pipeline Setup
+# Search for the best possiblity! GOGO
+param_dist = {"clf__n_estimators": sp_randint(1,20),
+              "clf__criterion":["gini", "entropy"],
+              "clf__max_features": sp_randint(1,20),
+              "clf__max_depth": sp_randint(1,10)}
+n_iter_search = 8000
+scoring = 'f1_micro'
+pipeline = Pipeline([("clf", RandomForestClassifier())])
 
-end_time = datetime.now()    
-print("Pipeline ready \n ",'Duration: {}'.format(end_time - start_time),
-      "\n+++++++++++++++++++++++++++++")
-#%% GridSearchCV 0
-n_components = range(3,10)
-Cs = np.logspace(-1, 1, 10)
+#%% Predictor 0
 
-estimator0 = GridSearchCV(pipe,
-                         dict(pca__n_components=n_components,
-                              logistic__C=Cs),
-                              scoring = "f1_micro",
-                              return_train_score=True)
+estimator0 = RandomizedSearchCV(pipeline, param_distributions=param_dist,
+                                   n_iter=n_iter_search, scoring=scoring, return_train_score=True)
 estimator0.fit(X, y0)
-
 end_time = datetime.now()    
-best_results0 = pd.DataFrame(estimator0.cv_results_)
-print("Best Estimator 0 found! \n ",'Duration: {}'.format(end_time - start_time),
-      "\n+++++++++++++++++++++++++++++")
+y_predicted = estimator0.predict(X)
+y_predicted_sampleset = estimator0.predict(X_sampleset)
 
-#%% Finding best Predictor 1 VS 2
+print("Estimator 0\nF1 Score : \t", f1_score(y0_sampleset, y_predicted_sampleset))
+print("Precision: \t", precision_score(y0_sampleset, y_predicted_sampleset))
 
-#%% Doing predictions: 0
+#print("\nEstimator 0\nF1 Score : \t", f1_score(y0, y_predicted))
+#print("Precision: \t", precision_score(y0, y_predicted))
+
+print("Duration: \t{}".format(end_time - start_time), "\n+++++++++++++++++++++++++++++")
+
+#%% Predictor 1
+
+estimator1 = RandomizedSearchCV(pipeline, param_distributions=param_dist,
+                                   n_iter=n_iter_search, scoring=scoring, return_train_score=True)
+estimator1.fit(X, y1)
+
+y_predicted = estimator1.predict(X)
+y_predicted_sampleset = estimator1.predict(X_sampleset)
+
+print("Estimator 1\nF1 Score : \t", f1_score(y1_sampleset, y_predicted_sampleset))
+print("Precision: \t", precision_score(y1_sampleset, y_predicted_sampleset))
+
+#print("\nEstimator 1\nF1 Score: \t", f1_score(y1, y_predicted))
+#print("Precision: \t", precision_score(y1, y_predicted))
+
+end_time = datetime.now() 
+print("Duration: \t{}".format(end_time - start_time), "\n+++++++++++++++++++++++++++++")
+
+#%% Predictor 2
+
+estimator2 = RandomizedSearchCV(pipeline, param_distributions=param_dist,
+                                   n_iter=n_iter_search, scoring='f1_micro', return_train_score=True)
+
+estimator2.fit(X, y2)
+y_predicted = estimator2.predict(X)
+y_predicted_sampleset = estimator2.predict(X_sampleset)
+
+print("Estimator 2\nF1 Score : \t", f1_score(y2_sampleset, y_predicted_sampleset))
+print("Precision: \t", precision_score(y2_sampleset, y_predicted_sampleset))
+
+end_time = datetime.now()
+#print("\nEstimator 2\nF1 Score: \t", f1_score(y2, y_predicted))
+#print("Precision: \t", precision_score(y2, y_predicted))
+
+print("Duration: \t{}".format(end_time - start_time), "\n+++++++++++++++++++++++++++++")
+
+#%% Predict 0 VS rest
 y_pred0 = estimator0.predict(X_testing)
-print("damage_grade 0 predicted! \n ",'Duration: {}'.format(end_time - start_time),
-      "\n+++++++++++++++++++++++++++++")
+y_bench0 = estimator0.predict(X)
+y_predicted_sampleset0 = estimator0.predict(X_sampleset)
 
-#%% Cutting out y_pred0 == 1
-X_testing = X_testing.loc[y_pred0 != 1,]
-print(X_testing.shape)
+print("damage_grade 0 predicted! \n ",'Duration: \t{}'.format(end_time - start_time), "\n+++++++++++++++++++++++++++++")
 
-#%% Predict 1 VS 2
+#%% Predict 1 VS rest
+y_pred1 = estimator1.predict(X_testing)
+y_bench1 = estimator1.predict(X)
+y_predicted_sampleset1 = estimator1.predict(X_sampleset)
+
+print("damage_grade 1 predicted! \n ",'Duration: \t{}'.format(end_time - start_time), "\n+++++++++++++++++++++++++++++")
+
+#%% Predict 2 VS rest
+y_pred2 = estimator2.predict(X_testing)
+y_bench2 = estimator2.predict(X)
+y_predicted_sampleset2 = estimator2.predict(X_sampleset)
+
+print("damage_grade 2 predicted! \n ",'Duration: \t{}'.format(end_time - start_time), "\n+++++++++++++++++++++++++++++")
+
 
 #%% Combine y_pred0 (strong 1s) on y_pred1
+y_final = np.ones(len(y_pred0)) + 1
+
+for x in range(len(y_final)):
+    if y_pred0[x] == 1:
+        y_final[x] = 1
+        
+for x in range(len(y_final)):
+    if y_pred1[x] == 1:
+        y_final[x] = 2  
+        
+for x in range(len(y_final)):
+    if y_pred2[x] == 1:
+        y_final[x] = 3
+
+
+    
+y_final = y_final.astype("int")
+#%% Testing
+        
+y_bench = np.ones(len(y_bench0)) + 1
+
+for x in range(len(y_bench0)):
+    if y_bench0[x] == 1:
+        y_bench[x] = 1
+
+for x in range(len(y_bench0)):
+    if y_bench1[x] == 1:
+        y_bench[x] = 2     
+
+for x in range(len(y_bench0)):
+    if y_bench2[x] == 1:
+        y_bench[x] = 3
+
+y_bench = y_bench.astype("int") - 1
+
+print("Estimator Total\nF1 Score: \t", f1_score(y_gen, y_bench, average='micro'))
+print("Precision : \t", precision_score(y_gen, y_bench, average = 'micro'),"\n+++++++++++++++++++++++++++++")
+
+#%% Testing2
+
+
+y_bench_sample = np.ones(len(y_predicted_sampleset0)) + 1
+"""
+def put_predictions_in(prediction, sample, value):
+    if sample[x] == 1:
+        prediction[x] = value
+
+y_bench_sample = put_predictions_in(y_predicted_sampleset0, 1 )
+"""
+
+for x in range(len(y_predicted_sampleset0)):
+    if y_predicted_sampleset0[x] == 1:
+        y_bench_sample[x] = 1
+
+for x in range(len(y_predicted_sampleset0)):
+    if y_predicted_sampleset1[x] == 1:
+        y_bench_sample[x] = 2
+
+for x in range(len(y_predicted_sampleset0)):
+    if y_predicted_sampleset2[x] == 1:
+        y_bench_sample[x] = 3
+
+y_bench_sample = y_bench_sample.astype("int") - 1
+
+print("\nEstimator Total\nF1 Score: \t", f1_score(y_gen_sampleset, y_bench_sample, average='micro'))
+print("Precision : \t", precision_score(y_gen_sampleset, y_bench_sample, average = 'micro'))
+
+#%% Results
+
+#print("\n0\t", estimator0.best_params_)
+#print("1\t", estimator1.best_params_)
+#print("2\t", estimator2.best_params_)
+
+#%% output
+
+output = pd.DataFrame(y_final, columns = ["damage_grade"])
+output.index = X_testing.index
+output.to_csv("/home/psylekin/AnacondaProjects/data_cap/submission.csv")
+
+print("Output completed!")
+
+"""
+Max = 0.652
+"""
